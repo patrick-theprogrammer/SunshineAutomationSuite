@@ -1,0 +1,1 @@
+powershell.exe -executionpolicy RemoteSigned -file ./app/scripts/Installer.ps1
