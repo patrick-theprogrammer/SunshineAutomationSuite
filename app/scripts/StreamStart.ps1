@@ -52,9 +52,28 @@ try {
     Import-Module $PSScriptRoot\..\modules\StreamEventHelper.psm1
     Set-Location $PSScriptRoot
 
-    # TODO validate settings
+    # Load and validate application settings
     $settings = Get-Content -Path $PSScriptRoot\..\..\settings\settings.json | ConvertFrom-Json
-    # Save a temp copy of the settings offline so that we have a stable set of values across stream start and end even if the user changes the actual settings file mid stream
+    if (-not $settings.monitors -or @($settings.monitors).Length -eq 0) { return $false }
+    foreach ($monitor in $settings.monitors) {
+        if (-not $monitor.id -or -not ($monitor.id -is "int")) {
+            Write-PSFMessage -Level Critical -Message "Invalid or missing id value for monitor name $($monitor.name)- exiting..."
+            exit
+        }
+        if ($monitor.resolution_while_streaming -and -not (@("NO_CHANGE","DISABLE_MONITOR","SYNC_RESOLUTION_TO_CLIENT","CUSTOM") -contains $monitor.resolution_while_streaming)) { 
+            Write-PSFMessage -Level Critical -Message "Invalid resolution_while_streaming value for monitor name $($monitor.name)- exiting..."
+            exit
+        }
+        if ($monitor.hdr_while_streaming -and -not (@("NO_CHANGE","SYNC_HDR_TO_CLIENT") -contains $monitor.hdr_while_streaming)) { 
+            Write-PSFMessage -Level Critical -Message "Invalid hdr_while_streaming value for monitor name $($monitor.name)- exiting..."
+            exit
+        }
+        if ($monitor.primary_while_streaming -and -not ($monitor.primary_while_streaming -is "boolean")) { 
+            Write-PSFMessage -Level Critical -Message "Invalid primary_while_streaming value for monitor name $($monitor.name)- exiting..."
+            exit
+        }
+    }
+    # Save a temp copy of the application settings offline so that we have a stable set of values across stream start and end and if the user changes the actual settings file mid stream
     $streamStartSettingsPath = "$($appconfig.temp_config_save_location)\stream_start_monitor_settings.json"
     if (Test-Path $streamStartSettingsPath) {
         Write-PSFMessage -Level Verbose -Message "Temp during stream session copy of settings already exists- this may indicate a failure in the last stream end. Overwriting..."
@@ -64,18 +83,18 @@ try {
     }
     ConvertTo-Json $settings | Set-Content -Path $($streamStartSettingsPath)
 
-    # Update graphics settings.
+    # Update graphics settings
     Write-PSFMessage -Level Verbose -Message "--------Stream started- update applicable graphics settings..."
     [void](StreamEventHelper\StartStreamingSession -appconfig $appconfig -settings $settings)
     Write-PSFMessage -Level Verbose -Message "Stream started- applicable graphics settings updated."
 
-    # Create simple keep alive listener pipe which allows other powershell scripts to end this process by connecting to it.
+    # Create simple keep alive listener pipe which allows other powershell scripts to end this process by connecting to it
     $keepAlivePipeName = "SunshineAutomationSuite-KeepAlive"
     Remove-Item "\\.\pipe\$keepAlivePipeName" -ErrorAction Ignore
     $keepAliveServerStream = New-Object System.IO.Pipes.NamedPipeServerStream($keepAlivePipeName, [System.IO.Pipes.PipeDirection]::In, 1, [System.IO.Pipes.PipeTransmissionMode]::Byte, [System.IO.Pipes.PipeOptions]::Asynchronous)
     $keepAliveConnection = $keepAliveServerStream.WaitForConnectionAsync()
 
-    # Wait for stream to end.
+    # Wait for stream to end
     Write-PSFMessage -Level Verbose -Message "Waiting for sunshine session to end..."
     $attemptsSinceLastLog = 0
     $lastStreamed = Get-Date
@@ -95,7 +114,7 @@ try {
             else {"Sunshine has not been streaming for more than $($appconfig.stream_end_grace_period) seconds- considering the stream as quit"}
         )"
 
-    # Revert graphics settings after stream has ended.
+    # Revert graphics settings after stream has ended
     Write-PSFMessage -Level Verbose -Message "Stream ended- reverting applicable graphics settings to original state..."
     [void](StreamEventHelper\CompleteStreamingSession -appconfig $appconfig)
     Write-PSFMessage -Level Verbose -Message "--------Stream ended- applicable graphics settings reverted to original state."
