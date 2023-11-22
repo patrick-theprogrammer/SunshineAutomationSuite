@@ -87,7 +87,7 @@ function RestartSunshineService() {
 
 
 
-Write-PSFMessage -Level Verbose -Message "$(if ($uninstall) {"un"})installing Sunshine Automation Suite..."
+Write-PSFMessage -Level Verbose -Message "$(if ($uninstall) {"Un"})Installing Sunshine Automation Suite..."
 
 # Setup logging and config
 Import-Module $PSScriptRoot\..\modules\Logger.psm1

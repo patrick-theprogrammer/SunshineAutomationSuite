@@ -1,17 +1,16 @@
 {
-    "monitors":  [
-                     {
-                         "hdr_while_streaming":  "NO_CHANGE",
-                         "name":  "Internal Display",
-                         "id":  265988,
-                         "resolution_while_streaming":  "DISABLE_MONITOR"
-                     },
-                     {
-                         "hdr_while_streaming":  "NO_CHANGE",
-                         "primary_while_streaming":  true,
-                         "name":  "HDMI2K",
-                         "id":  198147,
-                         "resolution_while_streaming":  "SYNC_RESOLUTION_TO_CLIENT"
-                     }
-                 ]
+    "monitors": [
+                    {
+                        "name":  "High Rate240",
+                        "id":  4352,
+                        "primary_while_streaming":  true,
+                        "resolution_while_streaming":  "SYNC_RESOLUTION_TO_CLIENT",
+                        "hdr_while_streaming":  "SYNC_HDR_TO_CLIENT"
+                    },
+                    {
+                        "name":  "AW3423DWF",
+                        "id":  4353,
+                        "resolution_while_streaming":  "DISABLE_MONITOR"
+                    }
+                ]
 }

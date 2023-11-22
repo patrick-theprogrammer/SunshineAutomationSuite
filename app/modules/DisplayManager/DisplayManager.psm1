@@ -196,8 +196,8 @@ function UpdateDisplaysFromFile($filePath) {
     foreach ($displayState in @($displayStates)) {
         $displayToUpdate = $null
         foreach ($enabledDisplay in $currentEnabledDisplays) {
-            if (($null -ne $enabledDisplay.Target.Id) -and ($enabledDisplay.Target.Id -eq $displayState.Target.Id)) { 
-                $displayToUpdate = $display
+            if (($null -ne $displayState.Target.Id) -and ($enabledDisplay.Target.Id -eq $displayState.Target.Id)) { 
+                $displayToUpdate = $enabledDisplay
                 break
             }
         }
