@@ -135,5 +135,5 @@ SetSunshineGlobalPrepCommands $commands
 # Restart the sunshine service to apply config changes.
 RestartSunshineService
 
-Write-PSFMessage -Level Verbose -Message "Sunshine Automation Suite $(if ($uninstall) {"un"})installed successfully. You can close this window."
+Write-PSFMessage -Level Verbose -Message "Sunshine Automation Suite $(if ($uninstall) {"un"})installed successfully."
 Write-Host "Sunshine Automation Suite $(if ($uninstall) {"un"})installed successfully. You can close this window."

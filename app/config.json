@@ -1,6 +1,6 @@
 {
     "log_level": "Debug",
-    "stream_start_delay": 3,
+    "stream_start_delay": 8,
     "stream_end_grace_period": 120,
     "stream_polling_interval": 2,
     "sunshine_config_path": "C:\\Program Files\\Sunshine\\config\\sunshine.conf",

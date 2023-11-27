@@ -237,16 +237,17 @@ function CurrentDisplayStatesAreSameAsFile($filePath) {
     foreach ($display in $allDisplays) {
         $matchingDisplayState = $null
         foreach ($displayState in $displayStates) {
-            if (($null -ne $display.Target.Id) -and ($display.Target.Id -eq $displayState.Target.Id)) {
+            if (($null -ne $displayState.Target.Id) -and ($display.Target.Id -eq $displayState.Target.Id)) {
                 $matchingDisplayState = $displayState
                 break
-            } elseif ($display.Source.Id -eq $displayState.Source.Id) { 
+            } elseif (($null -eq $displayState.Target.Id) -and ($display.Source.Id -eq $displayState.Source.Id)) { 
                 $matchingDisplayState = $displayState
+                break
             }
         }
         # Fail if any currently enabled displays aren't in the file or any current display states don't match enablement of any matching record in the file
         if (($display.Enabled -and -not $matchingDisplayState) -or ($display.Enabled -ne [boolean]$matchingDisplayState.Enabled)) { 
-            return $false 
+            return $false
         }
         if (-not $matchingDisplayState) { continue }
         # Fail if resolution or hdr differ on any current display which is in the file
