@@ -15,7 +15,12 @@
           </TableColumnHeader>
           <TableColumnHeader>
             <Label>Description</Label>
-            <Width>24</Width>
+            <Width>22</Width>
+            <Alignment>Left</Alignment>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Active</Label>
+            <Width>7</Width>
             <Alignment>Left</Alignment>
           </TableColumnHeader>
           <TableColumnHeader>
@@ -67,6 +72,9 @@
               </TableColumnItem>
               <TableColumnItem>
                 <PropertyName>Description</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>Active</PropertyName>
               </TableColumnItem>
               <TableColumnItem>
                 <PropertyName>Enabled</PropertyName>

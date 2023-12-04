@@ -47,7 +47,9 @@ PowerShellVersion = '5.1'
 # ProcessorArchitecture = ''
 
 # Modules that must be imported into the global environment prior to importing this module
-RequiredModules = @()
+RequiredModules = @(
+    'PSFramework'
+)
 
 # Assemblies that must be loaded prior to importing this module
 RequiredAssemblies = @()
@@ -81,7 +83,9 @@ FunctionsToExport = @(
     'SaveDisplaysToFile',
     'LoadDisplayStatesFromFile',
     'UpdateDisplaysFromFile',
-    'CurrentDisplayStatesAreSameAsFile'
+    'UpdateDisplaysToStates',
+    'CurrentDisplaysAreSameAsFile',
+    'CurrentDisplaysAreSameAsStates'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -104,11 +108,9 @@ PrivateData = @{
     PSData = @{
         # Tags applied to this module. These help with module discovery in online galleries.
         Tags = @(
-            'Automation',
             'Display Settings',
             'Game Streaming',
-            'Graphics Settings',
-            'Sunshine'
+            'Graphics Settings'
         )
 
         # A URL to the license for this module.

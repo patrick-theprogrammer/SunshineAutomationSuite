@@ -73,15 +73,6 @@ try {
             exit
         }
     }
-    # Save a temp copy of the application settings offline so that we have a stable set of values across stream start and end and if the user changes the actual settings file mid stream
-    $streamStartSettingsPath = "$($appconfig.temp_config_save_location)\stream_start_monitor_settings.json"
-    if (Test-Path $streamStartSettingsPath) {
-        Write-PSFMessage -Level Verbose -Message "Temp during stream session copy of settings already exists- this may indicate a failure in the last stream end. Overwriting..."
-    }
-    if (-not $(Test-Path $(Split-Path -Parent $streamStartSettingsPath) -PathType Container)) {
-        [void](New-Item -ItemType Directory -Path $(Split-Path -Parent $streamStartSettingsPath))
-    }
-    ConvertTo-Json $settings | Set-Content -Path $($streamStartSettingsPath)
 
     # Update graphics settings
     Write-PSFMessage -Level Verbose -Message "--------Stream started- update applicable graphics settings..."

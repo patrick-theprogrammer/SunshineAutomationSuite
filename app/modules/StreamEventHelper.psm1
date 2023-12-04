@@ -1,6 +1,7 @@
 Import-Module $PSScriptRoot\DisplayManager\DisplayManager.psd1
 
-$streamStartDisplayStateFileName = "stream_start_display_state.json"
+$streamStartDisplayStates = @()
+
 function StartStreamingSession($appconfig, $settings) {
     $allDisplays = DisplayManager_GetAllPotentialDisplays
     $enabledDisplays = @()
@@ -8,32 +9,26 @@ function StartStreamingSession($appconfig, $settings) {
     Write-PSFMessage -Level Debug -Message "Enabled display states before stream start monitor update:"
     foreach ($display in $enabledDisplays) { Write-PSFMessage -Level Debug -Message $($display.ToTableString()) }
 
-    # Save a copy of the current enabled display states to be loaded upon the stream ending
-    $streamStartDisplayStatePath = "$($appconfig.temp_config_save_location)\$streamStartDisplayStateFileName"
-    if ((Test-Path $streamStartDisplayStatePath) -and $(DisplayManager_LoadDisplayStatesFromFile -filePath $streamStartDisplayStatePath)) {
-        Write-PSFMessage -Level Warning -Message "Temp during game stream monitor state file already exists- this may indicate a failure in ending the last stream, so we will honor the existing file"
-    }
-    else {
-        if (-not $(Test-Path $($appconfig.temp_config_save_location) -PathType Container)) {
-            [void](New-Item -ItemType Directory -Path $($appconfig.temp_config_save_location))
-        }
-        if (-not $(DisplayManager_SaveDisplaysToFile -displays $enabledDisplays -filePath $streamStartDisplayStatePath)) {
-            Write-PSFMessage -Level Critical -Message "Failure in saving current monitor state on stream start- cancelling since we would not otherwise know what to revert to"
-            return
-        }
-    }
+    $script:streamStartDisplayStates = @()
+    $enabledDisplays | ForEach-Object { $script:streamStartDisplayStates += [PSCustomObject]$_ }
 
     # First, enable any monitors and then set primary as needed
     foreach ($monitor in $settings.monitors) {
         if (($monitor.resolution_while_streaming -ne "DISABLE_MONITOR") -or $monitor.primary_while_streaming) {
             $displayToUpdate = $null
-            # Update the existing enabled display connected to the target if there is one, else the next available display source
+            # Update the existing enabled display connected to the target if there is one, else the first available display source
             foreach ($display in $allDisplays) {
                 if (($null -ne $monitor.id) -and ($display.Target.Id -eq $monitor.id)) {
                     $displayToUpdate = $display
                     break
-                } elseif ((-not $displayToUpdate) -and ($display.Enabled -eq $false)) { 
-                    $displayToUpdate = $display
+                }
+            }
+            if (-not $displayToUpdate) {
+                foreach ($display in $allDisplays) {
+                    if ((-not $displayToUpdate) -and ($display.Enabled -eq $false)) { 
+                        $displayToUpdate = $display
+                        break
+                    }
                 }
             }
             if (-not $displayToUpdate) {
@@ -41,11 +36,12 @@ function StartStreamingSession($appconfig, $settings) {
                 continue
             }
 
-            [void]($displayToUpdate.Enable($monitor.id))
-            # Refresh target info after potential enable
-            $displayToUpdate = DisplayManager_GetRefreshedDisplay -display $displayToUpdate
-            if ($monitor.primary_while_streaming) {
-                [void](DisplayManager_SetPrimaryDisplay -display $displayToUpdate)
+            if ($displayToUpdate.Enable($monitor.id)) {
+                # Refresh target info and set primary if required after successful enable
+                $displayToUpdate = DisplayManager_GetRefreshedDisplay -display $displayToUpdate
+                if ($monitor.primary_while_streaming) {
+                    [void](DisplayManager_SetPrimaryDisplay -display $displayToUpdate)
+                }
             }
         }
     }
@@ -131,23 +127,19 @@ function StartStreamingSession($appconfig, $settings) {
 
 function CompleteStreamingSession($appconfig) {
     # Revert monitor resolutions/enablements/etc
-    $streamStartDisplayStatePath = "$($appconfig.temp_config_save_location)\$streamStartDisplayStateFileName"
-    if (-not (Test-Path $streamStartDisplayStatePath)) {
-        Write-PSFMessage -Level Warning -Message "Unable to revert monitor settings after game stream ended- stream start monitor state could not be found"
+    if (-not $script:streamStartDisplayStates -or $script:streamStartDisplayStates.Count -eq 0) {
+        Write-PSFMessage -Level Warning -Message "Unable to complete streaming session- no stream start display states found to revert to"
         return $false
     }
 
-    if (-not (DisplayManager_UpdateDisplaysFromFile -filePath $($streamStartDisplayStatePath))) {
+    if (-not (DisplayManager_UpdateDisplaysToStates -displayStates $script:streamStartDisplayStates)) {
         Write-PSFMessage -Level Critical -Message "Error reverting one or more necessary monitor settings after game stream ended"
         return $false           
     }
     # Wait a short time and double check everything was updated correctly
     Start-Sleep -Milliseconds 500
-    if (-not (DisplayManager_CurrentDisplayStatesAreSameAsFile -filePath $($streamStartDisplayStatePath))) {
+    if (-not (DisplayManager_CurrentDisplaysAreSameAsStates -displayStates $script:streamStartDisplayStates)) {
         Write-PSFMessage -Level Warning -Message "Unable to validate that all display settings were reverted correctly after game stream ended"
         return $false
     }
-    
-    # Try to clean up temp during stream config file directory if everything was successful- we don't need it anymore
-    Remove-Item -Recurse -Force $appconfig.temp_config_save_location
 }

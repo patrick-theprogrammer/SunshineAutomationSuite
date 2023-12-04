@@ -101,9 +101,6 @@ if ($appconfig.log_level) {
     [void](Logger\SetLogLevel -logLevelString $appconfig.log_level)
 }
 
-# Sunshine configuration file path.
-$sunshineConfigPath = $appconfig.sunshine_config_path
-
 # If the current user is not an administrator, re-launch this script with elevated privileges.
 $isAdmin = [bool]([System.Security.Principal.WindowsIdentity]::GetCurrent().groups -match 'S-1-5-32-544')
 if (-not $isAdmin) {
@@ -111,8 +108,11 @@ if (-not $isAdmin) {
     exit
 }
 
+# Sunshine configuration file path.
+$sunshineConfigPath = $ExecutionContext.InvokeCommand.ExpandString($appconfig.sunshine_config_path)
+
 # Only run if sunshine is installed at the expected path.
-if (-not $appconfig.sunshine_config_path -or -not $(Test-Path $sunshineConfigPath -PathType Leaf)) {
+if (-not $sunshineConfigPath -or -not $(Test-Path $sunshineConfigPath -PathType Leaf)) {
     Write-PSFMessage -Level Critical -Message "Sunshine Automation Suite $(if ($uninstall) {"un"})install failed. Unable to find sunshine configuration file at $sunshineConfigPath"
     exit
 }

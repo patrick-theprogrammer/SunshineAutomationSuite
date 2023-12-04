@@ -18,6 +18,12 @@
         </GetScriptBlock>
       </ScriptProperty>
       <ScriptProperty>
+        <Name>Active</Name>
+        <GetScriptBlock>
+            $this.Source._GetIsActive()
+        </GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
         <Name>Enabled</Name>
         <GetScriptBlock>
             $this._GetIsEnabled()

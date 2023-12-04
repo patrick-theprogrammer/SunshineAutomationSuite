@@ -59,7 +59,7 @@ class Display {
     }
 
     hidden [bool]_SetEnablement($enablement, $destinationTargetId) {
-        $actualDestinationTargetId = 0
+        $actualDestinationTargetId = $null
         if ($enablement) {
             if ($destinationTargetId) { $actualDestinationTargetId = $destinationTargetId }
             elseif ($this.Target) { $actualDestinationTargetId = $this.Target.Id }              
@@ -104,8 +104,9 @@ class Display {
             Write-PSFMessage -Level Verbose -Message "Display $($this.Description) enablement state set to $enablement successfully"
             return $true
         }
-        Write-PSFMessage -Level Debug -Message "No active display configuration path found for display $($this.Description) when setting enablement to $enablement"
-        if (-not $enablement) { Write-PSFMessage -Level Debug -Message "This likely indicates the display is already disabled" }         
+        Write-PSFMessage -Level Debug -Message "No display configuration path found for display $($this.Description) when setting enablement to $($enablement): this likely indicates $(if ($enablement) 
+        { "the destination target id $actualDestinationTargetId doesn't exist- maybe refresh monitor settings" } 
+        else { "the display is already disabled" })" 
         return $false
     }
 

@@ -157,10 +157,16 @@ function LoadDisplayStatesFromFile($filePath) {
 function UpdateDisplaysFromFile($filePath) {
     $displayStates = LoadDisplayStatesFromFile -filePath $filePath
     if (-not $displayStates) { return $false }
+    return UpdateDisplaysToStates -displayStates $displayStates
+}
+
+function UpdateDisplaysToStates($displayStates) {
     $allDisplays = GetAllPotentialDisplays
     if (-not $allDisplays) { return $false }
-    Write-PSFMessage -Level Debug -Message "Enabled display states before monitor update from file:"
-    foreach ($display in $allDisplays) { if ($display.Enabled) { Write-PSFMessage -Level Debug -Message $($display.ToTableString()) } }
+    Write-PSFMessage -Level Debug -Message "Updating displays to the following states:"
+    $displayStates | ForEach-Object { Write-PSFMessage -Level Debug -Message $($_ | Format-Table | Out-String) }
+    Write-PSFMessage -Level Debug -Message "Enabled displays before updating display states:"
+    $allDisplays | ForEach-Object { if ($_.Enabled) { Write-PSFMessage -Level Debug -Message $($_.ToTableString()) } }
 
     # First, enable any monitors and set primary as needed
     foreach ($displayState in @($displayStates)) {
@@ -180,11 +186,12 @@ function UpdateDisplaysFromFile($filePath) {
                 continue
             }
 
-            [void]($displayToUpdate.Enable($displayState.Target.Id))
-            # Refresh target info after potential enable
-            $displayToUpdate = DisplayManager_GetRefreshedDisplay -display $displayToUpdate
-            if ($displayState.Primary) {
-                [void](DisplayManager_SetPrimaryDisplay -display $displayToUpdate)
+            if ($displayToUpdate.Enable($displayState.Target.Id)) {
+                # Refresh target info and set primary if required after successful enable
+                $displayToUpdate = GetRefreshedDisplay -display $displayToUpdate
+                if ($displayState.Primary) {
+                    [void](SetPrimaryDisplay -display $displayToUpdate)
+                }
             }
         }
     }
@@ -224,14 +231,18 @@ function UpdateDisplaysFromFile($filePath) {
         }
     }
 
-    Write-PSFMessage -Level Debug -Message "Enabled display states after monitor update from file:"
+    Write-PSFMessage -Level Debug -Message "Enabled displays after updating display states:"
     # We may have disabled some displays in the last step- filter those out
     foreach ($display in $currentEnabledDisplays) { if ($display.Enabled) { Write-PSFMessage -Level Debug -Message $($display.ToTableString()) } }
 }
 
-function CurrentDisplayStatesAreSameAsFile($filePath) {
+function CurrentDisplaysAreSameAsFile($filePath) {
     $displayStates = LoadDisplayStatesFromFile -filePath $filePath
     if (-not $displayStates) { return $false }
+    return CurrentDisplaysAreSameAsStates -displayStates $displayStates
+}
+
+function CurrentDisplaysAreSameAsStates($displayStates) {
     $allDisplays = GetAllPotentialDisplays
     if (-not $allDisplays) { return $false }
     foreach ($display in $allDisplays) {
