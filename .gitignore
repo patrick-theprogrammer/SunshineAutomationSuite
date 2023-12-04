@@ -1,13 +1,2 @@
 # Application logs
 app/logs/*.log
-
-# File for local testing powershell functionality of the app
-app/scripts/Test.ps1
-
-# The C# in this app is all compiled at powershell runtime- keep the source code and ignore vscode project/compilation metadata
-app/SunshineAutomationSuite.sln
-app/modules/DisplayManager/lib/DisplayInterop/DisplayInterop.csproj
-# For the same reason, ignore the main application runner and associated dotnet runtime files which are only used to locally test application C# functionality
-app/modules/DisplayManager/lib/DisplayInterop/Program.cs
-app/modules/DisplayManager/lib/DisplayInterop/bin/
-app/modules/DisplayManager/lib/DisplayInterop/obj/
