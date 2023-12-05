@@ -42,7 +42,6 @@ function GetDisplayByMonitorName($monitorName) {
 
 function _GetDisplay($index) {
     # We expect an error if the display source at that index does not exist- still try to fetch a couple times to be safe in case of any transient failures
-    # TODO put these params in app config?
     $maxAttempts = 2
     $attemptDelayMs = 100
     for ($i = 0; $i -lt $maxAttempts; $i++) {
@@ -92,13 +91,13 @@ function SetPrimaryDisplay($display) {
         if (-not $enabledDisplay.Equals($display)) { continue }
         if ($enabledDisplay.Primary) {
             Write-PSFMessage -Level Debug -Message "Display $($enabledDisplay.Description) is already the primary display, nothing to change"
-            return $false
+            return $true
         }
         $displayToUpdate = $enabledDisplay
     }
     if (-not $displayToUpdate) {
         Write-PSFMessage -Level Debug -Message "Unable to set Display $($display.Description) as primary- could not find currently enabled display at its source and target"
-        return $false
+        return $true
     }
 
     $displayToUpdateDeviceMode = $displayToUpdate.Source._GetDisplaySettingsDeviceMode()
@@ -154,25 +153,44 @@ function LoadDisplayStatesFromFile($filePath) {
     return (Get-Content -Raw -Path $filePath | ConvertFrom-Json)
 }
 
-function UpdateDisplaysFromFile($filePath) {
+function UpdateDisplaysFromFile() {
+    param(
+        [string]$filePath,
+        # Option of whether to disable any currently enabled displays which are not present in the specified display states
+        [switch]$disableNotSpecifiedDisplays
+    )
+
     $displayStates = LoadDisplayStatesFromFile -filePath $filePath
     if (-not $displayStates) { return $false }
-    return UpdateDisplaysToStates -displayStates $displayStates
+    return UpdateDisplaysToStates -displayStates $displayStates -disableNotSpecifiedDisplays:$disableNotSpecifiedDisplays
 }
 
-function UpdateDisplaysToStates($displayStates) {
+function UpdateDisplaysToStates() {
+    param(
+        [PSCustomObject[]]$displayStates,
+        # Option of whether to disable any currently enabled displays which are not present in the specified display states
+        [switch]$disableNotSpecifiedDisplays,
+        # Option of whether to double check that all updates occurred as expected after windows reports everything was successful
+        [switch]$validate
+    )
+
+    if (-not $displayStates) {
+        Write-PSFMessage -Level Verbose -Message "No display states specified- nothing to update"
+        return $true
+    }
     $allDisplays = GetAllPotentialDisplays
     if (-not $allDisplays) { return $false }
     Write-PSFMessage -Level Debug -Message "Updating displays to the following states:"
-    $displayStates | ForEach-Object { Write-PSFMessage -Level Debug -Message $($_ | Format-Table | Out-String) }
-    Write-PSFMessage -Level Debug -Message "Enabled displays before updating display states:"
+    $displayStates | ForEach-Object { Write-PSFMessage -Level Debug -Message $(($_ | ConvertTo-Json -Compress | Out-String).Trim()) }
+    Write-PSFMessage -Level Debug -Message "Enabled displays before updating:"
     $allDisplays | ForEach-Object { if ($_.Enabled) { Write-PSFMessage -Level Debug -Message $($_.ToTableString()) } }
+    $allUpdatesSuccessful = $true
 
     # First, enable any monitors and set primary as needed
     foreach ($displayState in @($displayStates)) {
         if ($displayState.Enabled -or $displayState.Primary) {
             $displayToUpdate = $null
-            # Update the existing enabled display connected to the target if there is one, else the next available display source
+            # Update the existing enabled display connected to the target if there is one, else the first available display source
             foreach ($display in $allDisplays) {
                 if (($null -ne $displayState.Target.Id) -and ($display.Target.Id -eq $displayState.Target.Id)) {
                     $displayToUpdate = $display
@@ -182,15 +200,16 @@ function UpdateDisplaysToStates($displayStates) {
                 }
             }
             if (-not $displayToUpdate) {
-                Write-PSFMessage -Level Warning -Message "No available display source found to enable for monitor $($displayState.Description) from file- are there open outputs on your host device?"
+                Write-PSFMessage -Level Warning -Message "No available display source found to enable for monitor $($displayState.Description)- are there open outputs on your host device?"
                 continue
             }
 
-            if ($displayToUpdate.Enable($displayState.Target.Id)) {
-                # Refresh target info and set primary if required after successful enable
+            if (-not $displayToUpdate.Enable($displayState.Target.Id)) { $allUpdatesSuccessful = $false } 
+            elseif ($displayToUpdate.Enabled) {
+                # Refresh target info and set primary if required after effective enable
                 $displayToUpdate = GetRefreshedDisplay -display $displayToUpdate
                 if ($displayState.Primary) {
-                    [void](SetPrimaryDisplay -display $displayToUpdate)
+                    if (-not (SetPrimaryDisplay -display $displayToUpdate)) { $allUpdatesSuccessful = $false }
                 }
             }
         }
@@ -209,40 +228,73 @@ function UpdateDisplaysToStates($displayStates) {
             }
         }
         if (-not $displayToUpdate) {
-            Write-PSFMessage -Level Debug -Message "No enabled display found to update for display state of $($displayState.Description) from file"
+            Write-PSFMessage -Level Debug -Message "No enabled display found to update for display state of $($displayState.Description)"
             continue
         }
         if ($displayState.Enabled -eq $false) { 
-            [void]($displayToUpdate.Disable())
+            if (-not $displayToUpdate.Disable()) { $allUpdatesSuccessful = $false }
             continue
         }
-        if ($displayState.HdrInfo.HdrEnabled -eq $true) { [void]($displayToUpdate.EnableHdr()) }
-        else { [void]($displayToUpdate.DisableHdr()) }
-        $displayStateResolution = $displayState.Resolution
-        # If we fail to set resolution with refresh rate, at least still try width x height
-        $displayToUpdate.SetResolution($displayStateResolution.Width, $displayStateResolution.Height, $displayStateResolution.RefreshRate) `
-            -or $displayToUpdate.SetResolution($displayStateResolution.Width, $displayStateResolution.Height)
-    }
-
-    # Also try to disable any currently enabled displays which aren't present in the file
-    foreach ($display in $currentEnabledDisplays) {
-        if ((@($displayStates) | Where-Object { $_.Target.Id -eq $display.Target.Id}).Length -eq 0) {
-            [void]($display.Disable())
+        if ($displayState.HdrInfo.HdrEnabled -is "boolean") {
+            if ($displayState.HdrInfo.HdrEnabled) {
+                if (-not $displayToUpdate.EnableHdr()) { $allUpdatesSuccessful = $false }
+            } else {
+                if (-not $displayToUpdate.DisableHdr()) { $allUpdatesSuccessful = $false }
+            }
+        }
+        if (($null -ne $displayState.Resolution.Width) -and ($null -ne $displayState.Resolution.Height)) {
+            # If we fail to set resolution with refresh rate, at least still try width x height
+            if (-not ($displayToUpdate.SetResolution($displayState.Resolution.Width, $displayState.Resolution.Height, $displayState.Resolution.RefreshRate) `
+                -or $displayToUpdate.SetResolution($displayState.Resolution.Width, $displayState.Resolution.Height))) {
+                    $allUpdatesSuccessful = $false
+            }
         }
     }
 
-    Write-PSFMessage -Level Debug -Message "Enabled displays after updating display states:"
+    # If requested, try to disable any currently enabled displays which aren't present in the file
+    if ($disableNotSpecifiedDisplays) {
+        foreach ($display in $currentEnabledDisplays) {
+            if ((@($displayStates) | Where-Object { ($null -ne $_.Target.Id) -and ($_.Target.Id -eq $display.Target.Id) }).Length -eq 0) {
+                if (-not $display.Disable()) { $allUpdatesSuccessful = $false }
+            }
+        }
+    }
+
+    Write-PSFMessage -Level Debug -Message "Enabled displays after updating:"
     # We may have disabled some displays in the last step- filter those out
-    foreach ($display in $currentEnabledDisplays) { if ($display.Enabled) { Write-PSFMessage -Level Debug -Message $($display.ToTableString()) } }
+    $currentEnabledDisplays | ForEach-Object {  if ($_.Enabled) { Write-PSFMessage -Level Debug -Message $($_.ToTableString()) } }
+
+    # Validate no errors were encountered during update. If requested, wait a short time and double check everything was successful.
+    if (-not $allUpdatesSuccessful) { return $false }
+    if ($validate) {
+        Start-Sleep -Milliseconds 500
+        if (-not (CurrentDisplaysAreSameAsStates -validateAllEnabledDisplaysSpecified:$disableNotSpecifiedDisplays -displayStates $displayStates)) {
+            Write-PSFMessage -Level Warning -Message "Unable to validate that all display settings were updated correctly"
+            return $false
+        }
+    }
+    return $true
 }
 
-function CurrentDisplaysAreSameAsFile($filePath) {
+function CurrentDisplaysAreSameAsFile() {
+    param(
+        [string]$filePath,
+        # Option of whether to validate that all enabled displays are represented in the specified display states
+        [switch]$validateAllEnabledDisplaysSpecified
+    )
+
     $displayStates = LoadDisplayStatesFromFile -filePath $filePath
     if (-not $displayStates) { return $false }
-    return CurrentDisplaysAreSameAsStates -displayStates $displayStates
+    return CurrentDisplaysAreSameAsStates -validateAllEnabledDisplaysSpecified:$validateAllEnabledDisplaysSpecified -displayStates $displayStates
 }
 
-function CurrentDisplaysAreSameAsStates($displayStates) {
+function CurrentDisplaysAreSameAsStates() {
+    param(
+        [PSCustomObject[]]$displayStates,
+        # Option of whether to validate that all enabled displays are represented in the specified display states
+        [switch]$validateAllEnabledDisplaysSpecified
+    )
+
     $allDisplays = GetAllPotentialDisplays
     if (-not $allDisplays) { return $false }
     foreach ($display in $allDisplays) {
@@ -251,16 +303,18 @@ function CurrentDisplaysAreSameAsStates($displayStates) {
             if (($null -ne $displayState.Target.Id) -and ($display.Target.Id -eq $displayState.Target.Id)) {
                 $matchingDisplayState = $displayState
                 break
-            } elseif (($null -eq $displayState.Target.Id) -and ($display.Source.Id -eq $displayState.Source.Id)) { 
+            } elseif (($null -eq $displayState.Target.Id) -and ($null -ne $displayState.Source.Id) -and ($display.Source.Id -eq $displayState.Source.Id)) { 
                 $matchingDisplayState = $displayState
                 break
             }
         }
-        # Fail if any currently enabled displays aren't in the file or any current display states don't match enablement of any matching record in the file
-        if (($display.Enabled -and -not $matchingDisplayState) -or ($display.Enabled -ne [boolean]$matchingDisplayState.Enabled)) { 
-            return $false
-        }
+
+        # If requested, fail if any currently enabled displays aren't in the file
+        if ($validateAllEnabledDisplaysSpecified -and $display.Enabled -and -not $matchingDisplayState) { return $false }
+        # Fail if any current display states don't match enablement of any matching record in the file
+        if (($matchingDisplayState.Enabled -is "boolean") -and ($display.Enabled -ne $matchingDisplayState.Enabled)) { return $false }
         if (-not $matchingDisplayState) { continue }
+
         # Fail if resolution or hdr differ on any current display which is in the file
         if ($display.HdrInfo.HdrEnabled -ne $matchingDisplayState.HdrInfo.HdrEnabled) { return $false }
         $displayResolution = $display.Resolution

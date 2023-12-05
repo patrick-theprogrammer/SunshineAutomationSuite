@@ -17,7 +17,7 @@ if ($appconfig.log_level) {
     [void](Logger\SetLogLevel -logLevelString $appconfig.log_level)
     # Set the console output log level to the same as the actual log level for developers running synchronously
     if ($developerMode -and $runSynchronous) {
-        [void](Logger\OutputToConsole -logLevelString $appconfig.log_level)
+        Logger\OutputToConsole -logLevelString $appconfig.log_level
     }
 }
 
@@ -48,13 +48,16 @@ try {
     # Since modules are otherwise tied to a powershell session, we reload the module fresh so a developer need not reload their session after a module level code 
     # IMPORTANT: This will not recompile C#- for that, a developer can run powershell.exe -ExecutionPolicy Bypass -File scriptpath
     if ($developerMode) { Get-Module DisplayManager | Remove-Module }
-    Import-Module $PSScriptRoot\..\modules\DisplayManager\DisplayManager.psd1
     Import-Module $PSScriptRoot\..\modules\StreamEventHelper.psm1
     Set-Location $PSScriptRoot
 
     # Load and validate application settings
     $settings = Get-Content -Path $PSScriptRoot\..\..\settings\settings.json | ConvertFrom-Json
-    if (-not $settings.monitors -or @($settings.monitors).Length -eq 0) { return $false }
+    if (-not $settings.monitors -or @($settings.monitors).Length -eq 0) {
+        Write-PSFMessage -Level Critical -Message "Empty or nonexistent monitor list in settings- exiting..."
+        exit
+    }
+    $settingsPrimaryMonitorCount = 0
     foreach ($monitor in $settings.monitors) {
         if (-not $monitor.id -or -not ($monitor.id -is "int")) {
             Write-PSFMessage -Level Critical -Message "Invalid or missing id value for monitor name $($monitor.name)- exiting..."
@@ -64,20 +67,27 @@ try {
             Write-PSFMessage -Level Critical -Message "Invalid resolution_while_streaming value for monitor name $($monitor.name)- exiting..."
             exit
         }
-        if ($monitor.hdr_while_streaming -and -not (@("NO_CHANGE","SYNC_HDR_TO_CLIENT") -contains $monitor.hdr_while_streaming)) { 
+        if ($monitor.hdr_while_streaming -and -not (@("NO_CHANGE","SYNC_HDR_TO_CLIENT","ENABLE","DISABLE") -contains $monitor.hdr_while_streaming)) { 
             Write-PSFMessage -Level Critical -Message "Invalid hdr_while_streaming value for monitor name $($monitor.name)- exiting..."
             exit
         }
-        if ($monitor.primary_while_streaming -and -not ($monitor.primary_while_streaming -is "boolean")) { 
-            Write-PSFMessage -Level Critical -Message "Invalid primary_while_streaming value for monitor name $($monitor.name)- exiting..."
-            exit
+        if ($monitor.primary_while_streaming) {
+            if (-not ($monitor.primary_while_streaming -is "boolean")) { 
+                Write-PSFMessage -Level Critical -Message "Invalid primary_while_streaming value for monitor name $($monitor.name)- exiting..."
+                exit
+            }
+            $settingsPrimaryMonitorCount += 1
         }
+    }
+    if ($settingsPrimaryMonitorCount -gt 1) {
+        Write-PSFMessage -Level Critical -Message "Found $settingsPrimaryMonitorCount monitors with primary_while_streaming true. Only one monitor can be primary- exiting..."
+        exit
     }
 
     # Update graphics settings
-    Write-PSFMessage -Level Verbose -Message "--------Stream started- update applicable graphics settings..."
-    [void](StreamEventHelper\StartStreamingSession -appconfig $appconfig -settings $settings)
-    Write-PSFMessage -Level Verbose -Message "Stream started- applicable graphics settings updated."
+    Write-PSFMessage -Level Verbose -Message "Stream started- updating applicable graphics settings..."
+    StreamEventHelper\StartStreamingSession -settings $settings
+    Write-PSFMessage -Level Verbose -Message "Applicable graphics settings update complete after stream start."
 
     # Create simple keep alive listener pipe which allows other powershell scripts to end this process by connecting to it
     $keepAlivePipeName = "SunshineAutomationSuite-KeepAlive"
@@ -90,25 +100,26 @@ try {
     $attemptsSinceLastLog = 0
     $lastStreamed = Get-Date
     do {
+        $pollingIntervalSecs = if ($appconfig.stream_polling_interval) {$appconfig.stream_polling_interval} else {2}
         if ($null -ne (Get-Process sunshine -ErrorAction SilentlyContinue) -and $null -ne (Get-NetUDPEndpoint -OwningProcess (Get-Process sunshine).Id -ErrorAction Ignore)) {
             $lastStreamed = Get-Date
         }
-        if ($attemptsSinceLastLog -gt 119) {
+        if ($attemptsSinceLastLog * $pollingIntervalSecs -ge 300) {
             Write-PSFMessage -Level Debug -Message "Still waiting for sunshine session to end..."
             $attemptsSinceLastLog = 0
         }
         $attemptsSinceLastLog += 1
-        Start-Sleep -Seconds $(if ($appconfig.stream_polling_interval) {$appconfig.stream_polling_interval} else {2})
+        Start-Sleep -Seconds $pollingIntervalSecs
     } until ($keepAliveConnection.IsCompleted -or (((Get-Date) - $lastStreamed).TotalSeconds -gt $appconfig.stream_end_grace_period))
     Write-PSFMessage -Level Debug -Message "$(
             if ($keepAliveConnection.IsCompleted) {"Stream quit by user"}
-            else {"Sunshine has not been streaming for more than $($appconfig.stream_end_grace_period) seconds- considering the stream as quit"}
+            else {"Sunshine has not been streaming for more than $($appconfig.stream_end_grace_period) seconds- considering stream as quit"}
         )"
 
     # Revert graphics settings after stream has ended
     Write-PSFMessage -Level Verbose -Message "Stream ended- reverting applicable graphics settings to original state..."
-    [void](StreamEventHelper\CompleteStreamingSession -appconfig $appconfig)
-    Write-PSFMessage -Level Verbose -Message "--------Stream ended- applicable graphics settings reverted to original state."
+    StreamEventHelper\CompleteStreamingSession
+    Write-PSFMessage -Level Verbose -Message "Applicable graphics settings reversion complete after stream end."
 }
 catch {
     Write-PSFMessage -Level Critical -Message "Unhandled exception" -ErrorRecord $_

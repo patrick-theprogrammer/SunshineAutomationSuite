@@ -36,11 +36,11 @@ class Display {
         return $this.SetResolution($recommendedResolution.Width, $recommendedResolution.Height)
     }
     [bool]EnableHdr() {
-        if (-not $this.Target) { return $false }
+        if (-not $this.Target) { return $true }
         return $this.Target._SetHdrEnablement($true)
     }
     [bool]DisableHdr() {
-        if (-not $this.Target) { return $false }
+        if (-not $this.Target) { return $true }
         return $this.Target._SetHdrEnablement($false)
     }
 
@@ -65,12 +65,12 @@ class Display {
             elseif ($this.Target) { $actualDestinationTargetId = $this.Target.Id }              
             else { 
                 Write-PSFMessage -Level Debug -Message "Display $($this.Description) cannot be enabled since it does not have a target stored from when it was created and one wasn't supplied"
-                return $false
+                return $true
             }
         }
         elseif ($this.Primary) {
             Write-PSFMessage -Level Debug -Message "Display $($this.Description) cannot be disabled since it is the primary display"
-            return $false
+            return $true
         }
         # To enable a display, we need paths that aren't active in order to activate one. To disable one, it is ok to get only active paths.
         $configInfo = $this._GetDisplayConfigInfo($enablement)
@@ -107,7 +107,7 @@ class Display {
         Write-PSFMessage -Level Debug -Message "No display configuration path found for display $($this.Description) when setting enablement to $($enablement): this likely indicates $(if ($enablement) 
         { "the destination target id $actualDestinationTargetId doesn't exist- maybe refresh monitor settings" } 
         else { "the display is already disabled" })" 
-        return $false
+        return $true
     }
 
     hidden [PSCustomObject]_GetDisplayConfigInfo([bool]$includeInactivePaths) {
@@ -137,7 +137,7 @@ class Display {
 
 # A single potential means of graphics output
 class Source {
-    # Unique source identifier (eg 0)
+    # Unique source identifier, typically an index (eg 0)
     [uint32]$Id
     # Source name (eg "\\.\DISPLAY1")
     [string]$Name
@@ -278,7 +278,6 @@ class Target {
         }
         if ($this.FriendlyName -eq "Unknown") {
             if (-not ([string]::IsNullOrWhitespace($pathTargetInfo.outputTechnology))) {
-                Write-PSFMessage -Level Debug -Message "Falling back to path output technology for friendly name of target id $($this.Id)"
                 $this.FriendlyName = [string]$pathTargetInfo.outputTechnology + " Display"
             }
             else {
