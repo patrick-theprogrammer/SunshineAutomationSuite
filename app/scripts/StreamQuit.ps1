@@ -9,7 +9,7 @@ try {
     exit
 }
 if ($appconfig.log_level) {
-    [void](Logger\SetLogLevel -logLevelString $appconfig.log_level)
+    Logger\SetLogLevel -logLevel $appconfig.log_level
 }
 
 # If the keep alive doesn't exist (ie there is nothing to quit), continue gracefully.

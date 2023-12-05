@@ -14,10 +14,10 @@ try {
     exit
 }
 if ($appconfig.log_level) {
-    [void](Logger\SetLogLevel -logLevelString $appconfig.log_level)
+    Logger\SetLogLevel -logLevel $appconfig.log_level
     # Set the console output log level to the same as the actual log level for developers running synchronously
     if ($developerMode -and $runSynchronous) {
-        Logger\OutputToConsole -logLevelString $appconfig.log_level
+        Logger\OutputToConsole -logLevel $appconfig.log_level
     }
 }
 
@@ -46,7 +46,7 @@ if (-not $mutex.WaitOne(0)) {
 
 try {
     # Since modules are otherwise tied to a powershell session, we reload the module fresh so a developer need not reload their session after a module level code 
-    # IMPORTANT: This will not recompile C#- for that, a developer can run powershell.exe -ExecutionPolicy Bypass -File scriptpath
+    # IMPORTANT: This will not recompile C#- for that, -ExecutionPolicy Bypass is required
     if ($developerMode) { Get-Module DisplayManager | Remove-Module }
     Import-Module $PSScriptRoot\..\modules\StreamEventHelper.psm1
     Set-Location $PSScriptRoot
@@ -95,7 +95,7 @@ try {
     $keepAliveServerStream = New-Object System.IO.Pipes.NamedPipeServerStream($keepAlivePipeName, [System.IO.Pipes.PipeDirection]::In, 1, [System.IO.Pipes.PipeTransmissionMode]::Byte, [System.IO.Pipes.PipeOptions]::Asynchronous)
     $keepAliveConnection = $keepAliveServerStream.WaitForConnectionAsync()
 
-    # Wait for stream to end
+    # Wait for stream to be either manually quit by user or have not been streaming for longer than a configured grace period
     Write-PSFMessage -Level Verbose -Message "Waiting for sunshine session to end..."
     $attemptsSinceLastLog = 0
     $lastStreamed = Get-Date

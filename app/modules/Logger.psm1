@@ -22,17 +22,18 @@ $logLevelMap = @{
     Info    = 5
     Debug   = 8
 }
-function SetLogLevel($logLevelString) {
-    if ($logLevelMap.ContainsKey($logLevelString)) {
-        Set-PSFLoggingProvider -Name "logfile" -InstanceName $logProviderName -MaxLevel $logLevelMap[$logLevelString]
+function SetLogLevel($logLevel) {
+    if ($logLevelMap.ContainsKey($logLevel)) {
+        Set-PSFLoggingProvider -Name "logfile" -InstanceName $logProviderName -MaxLevel $logLevelMap[$logLevel]
     } else {
-        Write-PSFMessage "Invalid log level setting `"$logLevelString`""
+        Set-PSFLoggingProvider -Name "logfile" -InstanceName $logProviderName -MaxLevel $logLevelMap["Info"]
+        Write-PSFMessage -Level Verbose -Message "Invalid log level setting $logLevel- assuming Info"
     }
 }
 
 # Use with caution: this will also increase log levels of any other of the user's PSFramework apps on the machine while this app runs
-function OutputToConsole($logLevelString) {
-    if ($logLevelMap.ContainsKey($logLevelString)) {
-        Set-PSFConfig -FullName PSFramework.Message.Info.Maximum -Value $logLevelMap[$logLevelString]
+function OutputToConsole($logLevel) {
+    if ($logLevelMap.ContainsKey($logLevel)) {
+        Set-PSFConfig -FullName PSFramework.Message.Info.Maximum -Value $logLevelMap[$logLevel]
     }
 }
