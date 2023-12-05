@@ -7,16 +7,16 @@ try {
     exit
 }
 if ($appconfig.log_level) {
-    [void](Logger\SetLogLevel -logLevelString $appconfig.log_level)
+    Logger\SetLogLevel -logLevel $appconfig.log_level
 }
 
 # Try to overwrite monitor settings based on currently enabled displays
 try {
     Write-PSFMessage -Level Verbose -Message "--------Refreshing monitor settings..."
-    Import-Module $PSScriptRoot\..\modules\DisplayManager\DisplayManager.psd1
+    Import-Module $PSScriptRoot\..\modules\WindowsDisplayManager\WindowsDisplayManager.psd1
     $settings = Get-Content -Path $PSScriptRoot\..\..\settings\settings.json | ConvertFrom-Json
 
-    $enabledDisplays = DisplayManager_GetEnabledDisplays
+    $enabledDisplays = WindowsDisplayManager\GetEnabledDisplays
     Write-PSFMessage -Level Debug -Message "Currently enabled displays:"
     $newMonitorsList = @()
     foreach ($display in $enabledDisplays) {
