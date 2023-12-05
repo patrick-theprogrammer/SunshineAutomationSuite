@@ -1,11 +1,11 @@
-Import-Module $PSScriptRoot\DisplayManager\DisplayManager.psd1
+Import-Module $PSScriptRoot\WindowsDisplayManager\WindowsDisplayManager.psd1
 
 $streamStartDisplayStates = @()
 $maxDisplayUpdateAttempts = 3
 
 function StartStreamingSession($settings) {
     $script:streamStartDisplayStates = @()
-    DisplayManager\GetEnabledDisplays | ForEach-Object { $script:streamStartDisplayStates += [PSCustomObject]$_ }
+    WindowsDisplayManager\GetEnabledDisplays | ForEach-Object { $script:streamStartDisplayStates += [PSCustomObject]$_ }
 
     $targetDisplayStates = @()
     foreach ($monitor in $settings.monitors) {
@@ -82,7 +82,7 @@ function StartStreamingSession($settings) {
     }
 
     for ($attempt = 0; $attempt -lt $maxDisplayUpdateAttempts; $attempt++) {
-        if (DisplayManager\UpdateDisplaysToStates -validate -displayStates $targetDisplayStates) { return }
+        if (WindowsDisplayManager\UpdateDisplaysToStates -validate -displayStates $targetDisplayStates) { return }
         Write-PSFMessage -Level Debug -Message "Issue setting one or more necessary monitor settings after game stream started- trying again..."
     }
     Write-PSFMessage -Level Critical -Message "Max attempts exceeded trying to update monitors after game stream started"
@@ -95,7 +95,7 @@ function CompleteStreamingSession() {
     }
 
     for ($attempt = 0; $attempt -lt $maxDisplayUpdateAttempts; $attempt++) {
-        if (DisplayManager\UpdateDisplaysToStates -disableNotSpecifiedDisplays -validate -displayStates $script:streamStartDisplayStates) { return }
+        if (WindowsDisplayManager\UpdateDisplaysToStates -disableNotSpecifiedDisplays -validate -displayStates $script:streamStartDisplayStates) { return }
         Write-PSFMessage -Level Debug -Message "Error setting one or more necessary monitor settings after game stream ended- trying again..."
     }
     Write-PSFMessage -Level Critical -Message "Max attempts exceeded trying to update monitors after game stream ended"
