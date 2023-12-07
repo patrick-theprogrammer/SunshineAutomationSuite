@@ -4,7 +4,8 @@ $keepAliveName = "SunshineAutomationSuite-KeepAlive"
 Import-Module $PSScriptRoot\..\modules\Logger.psm1
 try {
     $appconfig = Get-Content $PSScriptRoot\..\config.json | ConvertFrom-Json
-} catch {
+}
+catch {
     Write-PSFMessage -Level Critical "Unable to load app config json" -ErrorRecord $_
     exit
 }

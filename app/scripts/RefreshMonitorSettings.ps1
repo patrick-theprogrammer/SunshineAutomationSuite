@@ -1,8 +1,14 @@
+if (-not (Get-Module PSFramework -ListAvailable) -or -not (Get-Module WindowsDisplayManager -ListAvailable)) {
+    Write-PSFMessage -Level Critical "Unable to refresh monitor settings- SunshineAutomationSuite does not appear to be installed. Please install and try again."
+    exit
+}
+
 # Setup logging and config
 Import-Module $PSScriptRoot\..\modules\Logger.psm1
 try {
     $appconfig = Get-Content $PSScriptRoot\..\config.json | ConvertFrom-Json
-} catch {
+}
+catch {
     Write-PSFMessage -Level Critical "Unable to load app config json" -ErrorRecord $_
     exit
 }
@@ -13,7 +19,7 @@ if ($appconfig.log_level) {
 # Try to overwrite monitor settings based on currently enabled displays
 try {
     Write-PSFMessage -Level Verbose -Message "--------Refreshing monitor settings..."
-    Import-Module $PSScriptRoot\..\modules\WindowsDisplayManager\WindowsDisplayManager.psd1
+    Import-Module WindowsDisplayManager
     $settings = Get-Content -Path $PSScriptRoot\..\..\settings\settings.json | ConvertFrom-Json
 
     $enabledDisplays = WindowsDisplayManager\GetEnabledDisplays
@@ -24,9 +30,9 @@ try {
         Write-PSFMessage -Level Debug -Message $($display.ToTableString())
 
         $newMonitorSetting = @{
-            id = $display.Target.Id
-            name = $display.Target.FriendlyName
-            hdr_while_streaming = "NO_CHANGE"
+            id                         = $display.Target.Id
+            name                       = $display.Target.FriendlyName
+            hdr_while_streaming        = "NO_CHANGE"
             resolution_while_streaming = "NO_CHANGE"
         }
         # Merge in any existing user settings data for each active display
@@ -45,6 +51,7 @@ try {
     $settings | ConvertTo-Json | Set-Content -Path $PSScriptRoot\..\..\settings\settings.json
     Write-PSFMessage -Level Verbose -Message "Monitor settings refreshed successfully."
     Write-Host -Level Verbose -Message "Monitor settings refreshed successfully."
-} catch {
+}
+catch {
     Write-PSFMessage -Level Critical -Message "Unhandled exception when refreshing monitor settings:" -ErrorRecord $_
 }

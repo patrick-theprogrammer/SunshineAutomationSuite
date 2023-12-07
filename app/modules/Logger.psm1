@@ -25,7 +25,8 @@ $logLevelMap = @{
 function SetLogLevel($logLevel) {
     if ($logLevelMap.ContainsKey($logLevel)) {
         Set-PSFLoggingProvider -Name "logfile" -InstanceName $logProviderName -MaxLevel $logLevelMap[$logLevel]
-    } else {
+    }
+    else {
         Set-PSFLoggingProvider -Name "logfile" -InstanceName $logProviderName -MaxLevel $logLevelMap["Info"]
         Write-PSFMessage -Level Verbose -Message "Invalid log level setting $logLevel- assuming Info"
     }

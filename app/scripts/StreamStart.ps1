@@ -9,7 +9,8 @@ param(
 Import-Module $PSScriptRoot\..\modules\Logger.psm1
 try {
     $appconfig = Get-Content $PSScriptRoot\..\config.json | ConvertFrom-Json
-} catch {
+}
+catch {
     Write-PSFMessage -Level Critical "Unable to load app config json" -ErrorRecord $_
     exit
 }
@@ -45,9 +46,6 @@ if (-not $mutex.WaitOne(0)) {
 }
 
 try {
-    # Since modules are otherwise tied to a powershell session, we reload the module fresh so a developer need not reload their session after a module level code 
-    # IMPORTANT: This will not recompile C#- for that, -ExecutionPolicy Bypass is required
-    if ($developerMode) { Get-Module DisplayManager | Remove-Module }
     Import-Module $PSScriptRoot\..\modules\StreamEventHelper.psm1
     Set-Location $PSScriptRoot
 
@@ -63,11 +61,11 @@ try {
             Write-PSFMessage -Level Critical -Message "Invalid or missing id value for monitor name $($monitor.name)- exiting..."
             exit
         }
-        if ($monitor.resolution_while_streaming -and -not (@("NO_CHANGE","DISABLE_MONITOR","SYNC_RESOLUTION_TO_CLIENT","CUSTOM") -contains $monitor.resolution_while_streaming)) { 
+        if ($monitor.resolution_while_streaming -and -not (@("NO_CHANGE", "DISABLE_MONITOR", "SYNC_RESOLUTION_TO_CLIENT", "CUSTOM") -contains $monitor.resolution_while_streaming)) { 
             Write-PSFMessage -Level Critical -Message "Invalid resolution_while_streaming value for monitor name $($monitor.name)- exiting..."
             exit
         }
-        if ($monitor.hdr_while_streaming -and -not (@("NO_CHANGE","SYNC_HDR_TO_CLIENT","ENABLE","DISABLE") -contains $monitor.hdr_while_streaming)) { 
+        if ($monitor.hdr_while_streaming -and -not (@("NO_CHANGE", "SYNC_HDR_TO_CLIENT", "ENABLE", "DISABLE") -contains $monitor.hdr_while_streaming)) { 
             Write-PSFMessage -Level Critical -Message "Invalid hdr_while_streaming value for monitor name $($monitor.name)- exiting..."
             exit
         }
@@ -100,7 +98,7 @@ try {
     $attemptsSinceLastLog = 0
     $lastStreamed = Get-Date
     do {
-        $pollingIntervalSecs = if ($appconfig.stream_polling_interval) {$appconfig.stream_polling_interval} else {2}
+        $pollingIntervalSecs = if ($appconfig.stream_polling_interval) { $appconfig.stream_polling_interval } else { 2 }
         if ($null -ne (Get-Process sunshine -ErrorAction SilentlyContinue) -and $null -ne (Get-NetUDPEndpoint -OwningProcess (Get-Process sunshine).Id -ErrorAction Ignore)) {
             $lastStreamed = Get-Date
         }

@@ -87,10 +87,24 @@ function RestartSunshineService() {
 
 
 
-Write-PSFMessage -Level Verbose -Message "$(if ($uninstall) {"Un"})Installing Sunshine Automation Suite..."
+# If the current user is not an administrator, re-launch this script with elevated privileges.
+$isAdmin = [bool]([System.Security.Principal.WindowsIdentity]::GetCurrent().groups -match 'S-1-5-32-544')
+if (-not $isAdmin) {
+    Start-Process powershell.exe  -Verb RunAs -ArgumentList "-ExecutionPolicy RemoteSigned -NoLogo -NoExit -File `"$PSCommandPath`"$(if ($uninstall) { " -uninstall" })"
+    exit
+}
+
+# If installing, install module dependencies on machine if not already done
+if (-not $uninstall -and -not (Get-Module PSFramework -ListAvailable)) {
+    Install-Module PSFramework -Force
+}
+if (-not $uninstall -and -not (Get-Module WindowsDisplayManager -ListAvailable)) {
+    Install-Module WindowsDisplayManager -Force
+}
 
 # Setup logging and config
 Import-Module $PSScriptRoot\..\modules\Logger.psm1
+Write-PSFMessage -Level Verbose -Message "$(if ($uninstall) {"Un"})Installing Sunshine Automation Suite..."
 try {
     $appconfig = Get-Content $PSScriptRoot\..\config.json | ConvertFrom-Json
 } catch {
@@ -98,14 +112,7 @@ try {
     exit
 }
 if ($appconfig.log_level) {
-    [void](Logger\SetLogLevel -logLevelString $appconfig.log_level)
-}
-
-# If the current user is not an administrator, re-launch this script with elevated privileges.
-$isAdmin = [bool]([System.Security.Principal.WindowsIdentity]::GetCurrent().groups -match 'S-1-5-32-544')
-if (-not $isAdmin) {
-    Start-Process powershell.exe  -Verb RunAs -ArgumentList "-ExecutionPolicy RemoteSigned -NoLogo -NoExit -File `"$PSCommandPath`"$(if ($uninstall) { " -uninstall" })"
-    exit
+    [void](Logger\SetLogLevel -logLevel $appconfig.log_level)
 }
 
 # Sunshine configuration file path.
@@ -115,11 +122,6 @@ $sunshineConfigPath = $ExecutionContext.InvokeCommand.ExpandString($appconfig.su
 if (-not $sunshineConfigPath -or -not $(Test-Path $sunshineConfigPath -PathType Leaf)) {
     Write-PSFMessage -Level Critical -Message "Sunshine Automation Suite $(if ($uninstall) {"un"})install failed. Unable to find sunshine configuration file at $sunshineConfigPath"
     exit
-}
-
-# If installing, install PSFramework dependency on machine if not already done
-if (-not $uninstall -and -not (Get-Module PSFramework -ListAvailable)) {
-    Install-Module PSFramework -Force
 }
 
 # Add or remove main script from sunshine global prep command configuration depending on uninstall argument switch.

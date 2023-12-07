@@ -1,4 +1,4 @@
-Import-Module $PSScriptRoot\WindowsDisplayManager\WindowsDisplayManager.psd1
+Import-Module WindowsDisplayManager
 
 $streamStartDisplayStates = @()
 $maxDisplayUpdateAttempts = 3
@@ -11,8 +11,8 @@ function StartStreamingSession($settings) {
     foreach ($monitor in $settings.monitors) {
         $targetDisplayState = @{
             Description = $monitor.Name
-            Target = @{ Id = $monitor.Id }
-            Enabled = (($monitor.resolution_while_streaming -ne "DISABLE_MONITOR") -or $monitor.primary_while_streaming)
+            Target      = @{ Id = $monitor.Id }
+            Enabled     = (($monitor.resolution_while_streaming -ne "DISABLE_MONITOR") -or $monitor.primary_while_streaming)
         }
         if ($null -ne $monitor.primary_while_streaming) { $targetDisplayState.Primary = $monitor.primary_while_streaming }
 
@@ -25,7 +25,7 @@ function StartStreamingSession($settings) {
                         break
                     }
                     $targetDisplayState.Resolution = @{
-                        Width = $env:SUNSHINE_CLIENT_WIDTH
+                        Width  = $env:SUNSHINE_CLIENT_WIDTH
                         Height = $env:SUNSHINE_CLIENT_HEIGHT
                     }
                     if ( $env:SUNSHINE_CLIENT_FPS ) { $targetDisplayState.Resolution.RefreshRate = $env:SUNSHINE_CLIENT_FPS }
@@ -39,7 +39,7 @@ function StartStreamingSession($settings) {
                         break
                     }
                     $targetDisplayState.Resolution = @{
-                        Width = $customResolution.width
+                        Width  = $customResolution.width
                         Height = $customResolution.height
                     }
                     if ( $customResolution.refresh_rate -is "int" ) { $targetDisplayState.Resolution.RefreshRate = $customResolution.refresh_rate }
