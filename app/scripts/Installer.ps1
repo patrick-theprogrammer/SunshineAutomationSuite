@@ -71,7 +71,7 @@ function GetSunshineGlobalPrepCommandsWithScript() {
     # Create a new object with the command to run the main script
     $sunshineAutomationSuiteCommand = [PSCustomObject]@{
         do       = "powershell.exe -Executionpolicy Bypass -WindowStyle Hidden -File `"$PSScriptRoot\StreamStart.ps1`""
-        elevated = "false"
+        elevated = "true"
         undo     = "powershell.exe -Executionpolicy Bypass -WindowStyle Hidden -File `"$PSScriptRoot\StreamQuit.ps1`""
     }
     # Add the new object to the global_prep_cmd array
@@ -95,11 +95,15 @@ if (-not $isAdmin) {
 }
 
 # If installing, install module dependencies on machine if not already done
-if (-not $uninstall -and -not (Get-Module PSFramework -ListAvailable)) {
-    Install-Module PSFramework -Force
-}
-if (-not $uninstall -and -not (Get-Module WindowsDisplayManager -ListAvailable)) {
-    Install-Module WindowsDisplayManager -Force
+if (-not $uninstall) {
+    if (-not (Get-Module PSFramework -ListAvailable)) {
+        Install-Module PSFramework -Force
+    }
+    if (-not (Get-Module WindowsDisplayManager -ListAvailable)) {
+        Install-Module WindowsDisplayManager -Force
+    } else {
+        Update-Module WindowsDisplayManager
+    }
 }
 
 # Setup logging and config
